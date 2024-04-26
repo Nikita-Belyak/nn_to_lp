@@ -13,7 +13,7 @@ Converts a NumPy file containing layer data into a Julia array of layers.
 
 """
 
-function npy_to_layers(data_folder_path::AbstractString)
+function npy_to_layers(data_folder_path::AbstractString, nn_type::AbstractString = "icnn" )
 
     # Get a list of file names in the folder
     file_names = readdir(data_folder_path)
@@ -31,22 +31,38 @@ function npy_to_layers(data_folder_path::AbstractString)
     # initatialize the layers array
     layers = []
 
+    if nn_type == "icnn"
     #fill the layers array with the data from the .npy files
-    for l in 0:layers_num
-        # load the data from the .npy files
-        data_A = npzread(data_folder_path*"/layer$l"*"_matrix_A.npy")
-        data_b = npzread(data_folder_path*"/layer$l"*"_matrix_b.npy")
-    
-        if l>0 # if the layers is not the input layer, load the W matrix
-            data_W = npzread(data_folder_path*"/layer$l"*"_matrix_W.npy")
-            # create a new layer with the data
-            new_layer = layer(l, data_A, data_W, data_b)
-        else
-            # if the layer is the input layer, initialize the W matrix as an empty array
-            new_layer = layer(l, data_A, zeros(Float32,0,0), data_b)
+        for l in 0:layers_num
+            # load the data from the .npy files
+            data_A = npzread(data_folder_path*"/layer_$l"*"_matrix_A.npy")
+            data_b = npzread(data_folder_path*"/layer_$l"*"_matrix_b.npy")
+            @show data_b
+            if l>0 # if the layers is not the input layer, load the W matrix
+                data_W = npzread(data_folder_path*"/layer_$l"*"_matrix_W.npy")
+                # create a new layer with the data
+                new_layer = layer(l, data_A, data_W, data_b)
+            else
+                # if the layer is the input layer, initialize the W matrix as an empty array
+                new_layer = layer(l, data_A, zeros(Float32,0,0), data_b)
+            end
+            # push the new layer to the layers array
+            push!(layers, new_layer)
         end
-        # push the new layer to the layers array
-        push!(layers, new_layer)
+    elseif nn_type == "nn"
+        for l in 0:layers_num
+            # load the data from the .npy files
+            data_W = npzread(data_folder_path*"/layer_$l"*"_matrix_W.npy")
+            data_b = npzread(data_folder_path*"/layer_$l"*"_matrix_b.npy")
+            @show typeof(data_W)
+            @show typeof(data_b)
+            @show typeof(l)
+        
+            new_layer = layer(l, zeros(Float32,0,0), data_W, data_b)
+
+            # push the new layer to the layers array
+            push!(layers, new_layer)
+        end
     end
     return layers
 end
@@ -107,9 +123,9 @@ A mutable struct representing a layer.
 
 mutable struct layer
     num::Int64
-    A::Matrix{Float32}
-    W::Matrix{Float32}
-    b::Matrix{Float32}
+    A::Array{Float32}
+    W::Array{Float32}
+    b::Array{Float32}
 end
 
 

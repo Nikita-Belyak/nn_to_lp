@@ -7,39 +7,30 @@ matplotlib.use("TkAgg")
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 from scipy.linalg import sqrtm
-import random
+#import random
 
 import sklearn
 import matplotlib.pylab as pl
-import ot
-import ot.plot
-from ot.datasets import make_1D_gauss as gauss
+# import ot
+# import ot.plot
+# from ot.datasets import make_1D_gauss as gauss
 
 # import os
 # os.environ['KMP_DUPLICATE_LIB_OK']='True'
 # os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
 # os.environ["CUDA_VISIBLE_DEVICES"]="0,3"  # specify which GPU(s) to be used
 
-parser = argparse.ArgumentParser()
-parser.add_argument('--DATASET_X', type=str, default='styblinski_tang', help='which dataset to use for X')
+class Options:
+    def __init__(self):
+        self.DATASET_X = 'sin'
+        self.LAMBDA = 1
+        self.NUM_NEURON = [8, 16, 32, 16, 8]
+        self.LR = 1e-3
+        self.ITERS = 10000
+        self.BATCH_SIZE = 32
+        self.INPUT_DIM = 1
 
-parser.add_argument('--LAMBDA', type=float, default=1, help='Regularization constant for positive weight constraints')
-
-parser.add_argument('--NUM_NEURON', type=int, default=16, help='number of neurons per layer')
-
-parser.add_argument('--NUM_LAYERS', type=int, default=3, help='number of hidden layers before output')
-
-parser.add_argument('--LR', type=float, default=1e-3, help='learning rate')
-
-parser.add_argument('--ITERS', type=int, default=1000, help='number of iterations of training')
-
-parser.add_argument('--BATCH_SIZE', type=int, default=1024, help='size of the batches')
-
-parser.add_argument('--N_TEST', type=int, default=2048, help='number of test samples')
-
-parser.add_argument('--INPUT_DIM', type=int, default=2, help='dimensionality of the input x')
-
-opt = parser.parse_args()
+opt = Options()
 print(opt)
 
 def main():
@@ -48,18 +39,18 @@ def main():
 	print("specify the convex function class")
 	
 	# save the number of neurons per layer
-	hidden_size_list = [opt.NUM_NEURON for i in range(opt.NUM_LAYERS)]
+	hidden_size_list = opt.NUM_NEURON
 
 	# add the output layer
 	hidden_size_list.append(1)
 	print(hidden_size_list)
 
 	# create the neural network structure
-	fn_model = Kantorovich_Potential(opt.INPUT_DIM, hidden_size_list)  
+	fn_model = ICNN(opt.INPUT_DIM, hidden_size_list)  
 
-	# Define the test set
-	print ("Define the test set")
-	data_test = next(sample_data_gen(opt.DATASET_X, opt.N_TEST))
+	# # Define the test set
+	# print ("Define the test set")
+	# data_test = next(sample_data_gen(opt.DATASET_X, opt.N_TEST))
 
 	saver = tf.train.Saver()
 	
@@ -69,30 +60,33 @@ def main():
 		compute_OT = ComputeOT(sess, opt.INPUT_DIM, fn_model,  opt.LR) # initilizing
 		
 		compute_OT.learn(opt.BATCH_SIZE, opt.ITERS, opt.DATASET_X, opt) # learning the optimal map
+
+		print(len(hidden_size_list))
 		
-		for nl in range(0, len(hidden_size_list)-1):
+		for nl in range(0, len(hidden_size_list)):
+				print("nl = ", nl)
 				
 				if nl == 0:
 					save_A = fn_model.A[nl].eval()
-					file_name_A = f"data/layer{nl}_matrix_A.npy"
+					file_name_A = f"data/icnn/layer_{nl}_matrix_A.npy"
 					np.save(file_name_A, save_A)
 
 					save_b = fn_model.b[nl].eval()
-					file_name_b = f"data/layer{nl}_matrix_b.npy"
+					file_name_b = f"data/icnn/layer_{nl}_matrix_b.npy"
 					np.save(file_name_b, save_b)
 
 				else: 
-					save_W = fn_model.W[nl].eval()
-					file_name_W = f"data/layer{nl}_matrix_W.npy"
+					save_W = fn_model.W[nl-1].eval()
+					file_name_W = f"data/icnn/layer_{nl}_matrix_W.npy"
 					#print(fn_model.W[nl].eval())
 					np.save(file_name_W, save_W)
 
 					save_A = fn_model.A[nl].eval()
-					file_name_A = f"data/layer{nl}_matrix_A.npy"
+					file_name_A = f"data/icnn/layer_{nl}_matrix_A.npy"
 					np.save(file_name_A, save_A)
 
 					save_b = fn_model.b[nl].eval()
-					file_name_b = f"data/layer{nl}_matrix_b.npy"
+					file_name_b = f"data/icnn/layer_{nl}_matrix_b.npy"
 					np.save(file_name_b, save_b)
 	
 
@@ -111,7 +105,7 @@ class ComputeOT:
 		
 		# define the input and output placeholders
 		self.x = tf.placeholder(tf.float32, [None, input_dim])
-		self.y = tf.placeholder(tf.float32, [None])
+		self.y = tf.placeholder(tf.float32, [None, input_dim])
 
 		# define the forward pass
 		self.fx = self.f_model.forward(self.x)
@@ -151,12 +145,12 @@ class ComputeOT:
 			print ("Iterations = %i, f_loss = %.4f" %(iteration,f_loss))
 					
 
-class Kantorovich_Potential:
+class ICNN:
 	''' 
-		Modelling the Kantorovich potential as Input convex neural network (ICNN)
+		Modellin Input convex neural network (ICNN)
 		input: y
 		output: z = h_L
-		Architecture: h_1     = ReLU^2(A_0 y + b_0)
+		Architecture: h_1     = ReLU(A_0 y + b_0)
 					  h_{l+1} =   ReLU(A_l y + b_l + W_{l-1} h_l)
 		Constraint: W_l > 0
 	'''
@@ -203,5 +197,10 @@ class Kantorovich_Potential:
 		for k in range(1,self.num_hidden_layers):
 			
 			z = tf.nn.leaky_relu(tf.matmul(input_y, self.A[k]) + self.b[k] + tf.matmul(z, self.W[k-1]))
-
+		
 		return z  
+	
+
+
+
+
