@@ -67,17 +67,19 @@ function nn_to_lp(layers::Vector{Any})
     # Use the @variable macro to create the variables
     @variable(model, z[j=1:length(n_of_neurons), i = 1:n_of_neurons[j]])
 
-    @variable(model, y[1,i = 1:size(layers[1].A,1)])
-
+    @variable(model, y[1,i = 1:size(layers[1].W,1)])
+    @show layers[1].W' .* model[:y] .+ layers[1].b
     # Add the constraints
     for i = 0:length(n_of_neurons)-1
     
         if i==0 # if it is the input layer
             # generate right-had side of the constraints: rhs = y*A_1 + b_1
-            rhs = (layers[i+1].b)'
+            # rhs = layers[i+1].W' .* model[:y] .+ layers[i+1].b
+            # @show rhs[1,:][2]
             # add the constraints correspoding to the relu activation function: that is z_1 >= max(0, rhs)
-            @show n_of_neurons[i+1]
-            @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] >= rhs[1,n])
+            # @show n_of_neurons[i+1]
+            # @show layers[i+1].W'[1,:] .* model[:y] .+ layers[i+1].b[1,:]
+            @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] .>= model[:y] .* layers[i+1].W[:,n] .+ layers[i+1].b[n,:])
             @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] >= 0)
         else 
             # generate the mutiplication z_i*W_i+1
@@ -86,7 +88,7 @@ function nn_to_lp(layers::Vector{Any})
             #generate the right-hand side of the constraints: rhs = y*A_i+1 + b_i+1 + z_i*W_i+1
             rhs = layers[i+1].b .+ zw
             # add the constraints correspoding to the relu activation function: that is z_i+1 >= max(0, rhs)
-            @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] >= rhs[1,n])
+            @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] >= rhs[n,1])
             @constraint(model, [n = 1:n_of_neurons[i+1]], z[i+1,n] >= 0)
         end 
    

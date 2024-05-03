@@ -11,29 +11,29 @@ from scipy.linalg import sqrtm
 
 import sklearn
 import matplotlib.pylab as pl
-# import ot
-# import ot.plot
-# from ot.datasets import make_1D_gauss as gauss
 
-# import os
-# os.environ['KMP_DUPLICATE_LIB_OK']='True'
-# os.environ["CUDA_DEVICE_ORDER"]="PCI_BUS_ID"
-# os.environ["CUDA_VISIBLE_DEVICES"]="0,3"  # specify which GPU(s) to be used
+import os
+import shutil
+
+from data_generation import sample_data_gen
 
 class Options:
-    def __init__(self):
-        self.DATASET_X = 'sin'
-        self.LAMBDA = 1
-        self.NUM_NEURON = [8, 16, 32, 16, 8]
-        self.LR = 1e-3
-        self.ITERS = 10000
-        self.BATCH_SIZE = 32
-        self.INPUT_DIM = 1
+	def __init__(self):
+		self.DATASET_X = 'sin'
+		self.LAMBDA = 1
+		self.NUM_NEURON = [8, 16]
+		self.LR = 1e-3
+		self.ITERS = 1000
+		self.BATCH_SIZE = 32
+		self.INPUT_DIM = 1
+		
+	def update(self, **kwargs):
+		for key, value in kwargs.items():
+			if hasattr(self, key):
+				setattr(self, key, value)
 
-opt = Options()
-print(opt)
 
-def main():
+def icnn_train(opt):
 
 	# specify the convex function class
 	print("specify the convex function class")
@@ -62,6 +62,20 @@ def main():
 		compute_OT.learn(opt.BATCH_SIZE, opt.ITERS, opt.DATASET_X, opt) # learning the optimal map
 
 		print(len(hidden_size_list))
+
+		# Specify the directory
+		dir_path = "data/icnn"
+
+		# Check if the directory exists
+		if os.path.exists(dir_path):
+			# Delete all files in the directory
+			for file_name in os.listdir(dir_path):
+				file_path = os.path.join(dir_path, file_name)
+				try:
+					if os.path.isfile(file_path):
+						os.unlink(file_path)
+				except Exception as e:
+					print(f"Failed to delete {file_path}. Reason: {e}")
 		
 		for nl in range(0, len(hidden_size_list)):
 				print("nl = ", nl)
@@ -128,7 +142,7 @@ class ComputeOT:
 		self.sess.run(self.init)
 
 		# Generate the training data
-		data_gen = sample_data_gen(dataset_x, batch_size)
+		data_gen = sample_data_gen( opt.DATASET_X, opt.BATCH_SIZE, opt)
 		print ("training data is created")
 
 		# generate training set 

@@ -25,7 +25,7 @@ function npy_to_layers(data_folder_path::AbstractString, nn_type::AbstractString
     end
 
 
-    # fetch the maximum number from the file names
+    # fetch the maximum number from  the file names
     layers_num = find_max_number(file_names) 
 
     # initatialize the layers array
